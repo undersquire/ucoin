@@ -1,4 +1,7 @@
-use std::time::UNIX_EPOCH;
+use std::{
+    collections::{HashMap, HashSet},
+    time::UNIX_EPOCH,
+};
 
 use base64ct::{Base64, Encoding};
 use serde::{Deserialize, Serialize};
@@ -50,14 +53,14 @@ impl Transaction {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct SignedTransaction {
-    #[serde(flatten)]
+    //#[serde(flatten)]
     transaction: Transaction,
     signature: String,
 }
 
 impl SignedTransaction {
     fn hash(&self) -> String {
-        let serialized = serde_json::to_string(self).unwrap();
+        let serialized = serde_json::to_string(&self).unwrap();
         let hash = blake3::hash(serialized.as_bytes());
 
         Base64::encode_string(hash.as_bytes())
@@ -76,6 +79,17 @@ impl SignedTransaction {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Wallet {
+    balance: u64,
+    history: HashSet<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct WorldState {
+    wallets: HashMap<String, Wallet>,
+}
+
 fn main() {
     oqs::init();
 
@@ -84,10 +98,37 @@ fn main() {
     let sender = sig.keypair().unwrap();
     let receiver = sig.keypair().unwrap();
 
+    let start = std::time::Instant::now();
     let transaction = Transaction::new(&[], &sender.0, 1000, &receiver.0).sign(&sig, &sender.1);
+    let sign_duration = start.elapsed();
+
+    let start = std::time::Instant::now();
+    let verified = transaction.verify(&sig);
+    let verify_duration = start.elapsed();
 
     let serialized = serde_json::to_string_pretty(&transaction).unwrap();
 
     println!("{serialized}");
-    println!("VERIFIED: {}", transaction.verify(&sig));
+    println!(
+        "VERIFIED: {}, {:?} sign, {:?} verify, NIST Level {}",
+        verified,
+        sign_duration,
+        verify_duration,
+        sig.claimed_nist_level()
+    );
+
+    let start = std::time::Instant::now();
+    let serialized = serde_json::to_string(&transaction).unwrap();
+    let ser_duration = start.elapsed();
+
+    let start = std::time::Instant::now();
+    let _deserialized: SignedTransaction = serde_json::from_str(&serialized).unwrap();
+    let de_duration = start.elapsed();
+
+    println!(
+        "JSON: {} bytes, {:?} ser, {:?} de",
+        serialized.as_bytes().len(),
+        ser_duration,
+        de_duration
+    );
 }
