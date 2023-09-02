@@ -1,0 +1,11 @@
+[package]
+name = "ucoin"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+blake3 = "1"
+oqs = { version = "0.8", default-features = false, features = ["falcon"] }
+base64ct = { version = "1", features = ["std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
